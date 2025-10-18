@@ -1,0 +1,137 @@
+---
+title: "AFE y AFC"
+author: "rmoraga"
+date: "2025-09-07"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+#Librerías
+
+```{r}
+library(openxlsx)
+library(psych)
+library(lavaan)
+library(paran)
+library(cebn) #librería profesor Claudio Bustos
+library(semTools)
+
+```
+
+#Cargar base de datos
+
+```{r}
+db<-read.xlsx("20250906_Análisis_preliminar.xlsx")
+```
+
+#Separar base de datos en solo el instrumento PEIEL
+
+```{r}
+PEIEL<-subset(db, select=PEIEL_1:PEIEL_6)
+```
+
+#1. Análisis fatorial exploratorio
+
+#1.1. Descriptivos escala
+
+```{r}
+psych::describe(PEIEL)
+
+```
+
+#1.2. Ver las correlaciones
+
+```{r}
+corrgram::corrgram(PEIEL)
+```
+
+#1.3. Bartlett
+
+```{r}
+cortest.bartlett(PEIEL)
+```
+
+#1.4. KMO
+
+```{r}
+KMO(PEIEL)
+
+#“La adecuación muestral fue satisfactoria (KMO = 0.84), y el test de esfericidad de Bartlett indicó que la matriz de correlaciones era factorizable, χ²(15) = 1725.31, p < .001. Estos resultados respaldan la pertinencia de realizar análisis factoriales confirmatorios para evaluar la estructura latente de la escala PEIEL.”
+```
+
+#1.5. Paralelo de Horn
+
+```{r}
+paran::paran(na.omit(PEIEL), iterations = 5000,centile = 95,cfa = T)
+```
+
+#Prueba con 1 factor
+
+```{r}
+fa.1<-fa(PEIEL, nfactors=1, fm="minres", rotate="oblimin")
+```
+
+#Prueba con 2 factores
+
+```{r}
+fa.2<-fa(PEIEL, nfactors=2, fm="minres", rotate="oblimin")
+```
+
+#Para ver en excel
+
+```{r}
+fa2xlsx(fa.1, fa.2, cut = 0.4, filename = "análisis.factorial.PEIEL.xlsx")
+
+#“El análisis factorial exploratorio con un factor mostró cargas factoriales entre .54 y .82, lo que respalda la presencia de un constructo general. No obstante, al explorar una solución de dos factores, los ítems se distribuyeron en dos bloques conceptualmente consistentes: PEIEL_5, PEIEL_6 y PEIEL_4 cargaron en el primer factor (adversidad financiera y recursos básicos), mientras que PEIEL_3, PEIEL_2 y PEIEL_1 lo hicieron en el segundo (acceso a bienes y servicios). Estas dos soluciones son consistentes con la estructura reportada en estudios previos, aunque en la presente muestra un único factor explica la mayor parte de la varianza, lo que respalda el uso de una puntuación global.”
+```
+
+#2. Análisis Factorial Confirmatorio
+```{r}
+dt<-data.frame(lapply(PEIEL, as.numeric))
+
+```
+
+#Modelo 6 ítems 1 factor
+```{r}
+modelo.fa.1="
+modelo.fa.1cfa=~ PEIEL_1 + PEIEL_2 + PEIEL_3 + PEIEL_4 + PEIEL_5 + PEIEL_6
+"
+
+cfa.PEIEL.1.mlr<-cfa(modelo.fa.1, dt, estimator="mlr")
+
+summary(cfa.PEIEL.1.mlr)
+fitMeasures(cfa.PEIEL.1.mlr)
+
+#“El modelo de un factor mostró cargas factoriales significativas en todos los ítems (λ = 1.10–1.42, p < .001). No obstante, el ajuste global fue insuficiente (χ²(9) = 224.81, p < .001), lo que sugiere que un modelo estrictamente unidimensional no representa de manera óptima la estructura de los datos. Estos resultados son consistentes con el análisis exploratorio, donde se identificó un factor general junto con evidencia de una subestructura de dos dimensiones (acceso a bienes y servicios y adversidad financiera).”
+```
+
+#Modelo 6 ítems 2 factores
+
+```{r}
+modelo.fa.2="
+accesobys=~ PEIEL_1 + PEIEL_2 + PEIEL_3 
+adversidadfinanciera=~ PEIEL_4 + PEIEL_5 + PEIEL_6
+"
+
+cfa.PEIEL.2.mlr<-cfa(modelo.fa.2, dt, estimator="mlr")
+
+summary(cfa.PEIEL.2.mlr)
+fitMeasures(cfa.PEIEL.2.mlr)
+
+#“Se evaluaron dos modelos confirmatorios para la escala PEIEL. En primer lugar, se ajustó un modelo unidimensional con los seis ítems, el cual mostró cargas factoriales significativas en todos los indicadores (λ = 1.10–1.42, p < .001). No obstante, el ajuste global fue insatisfactorio (χ²(9) = 224.81, p < .001; CFI = .875; TLI = .791; RMSEA = .207 [.184–.231]; SRMR = .073), lo que sugiere que la estructura estrictamente unidimensional no representa adecuadamente los datos. Posteriormente, se estimó un modelo de dos factores correlacionados, definidos como acceso a bienes/servicios (ítems 1–3) y adversidad financiera (ítems 4–6). Este modelo presentó un ajuste excelente (χ²(8) = 12.32, p = .137; CFI = .997; TLI = .995; RMSEA = .031 [.000–.063]; SRMR = .017), con cargas factoriales elevadas y significativas en todos los ítems (λ = 1.08–1.29, p < .001). La correlación entre los factores fue positiva y moderada (φ = .46, p < .001), indicando que ambas dimensiones comparten varianza pero no son redundantes. En conjunto, estos hallazgos respaldan que la escala PEIEL se organiza en dos dimensiones relacionadas, consistentes con la validación previa en población chilena.”
+```
+#Confiabilidad modelo de dos dimensiones
+```{r}
+rel_tab <- semTools::reliability(cfa.PEIEL.2.mlr)
+
+rel_tab
+
+#“En cuanto a la fiabilidad, la subescala de acceso a bienes y servicios presentó índices adecuados (α = .78; ω = .79; AVE = .56), mientras que la subescala de adversidad financiera mostró una consistencia interna alta (α = .86; ω = .87; AVE = .68). Estos resultados respaldan que ambas dimensiones de la escala PEIEL cuentan con una fiabilidad suficiente para ser utilizadas en el modelo de investigación.”
+
+```
+
+
+
+
+

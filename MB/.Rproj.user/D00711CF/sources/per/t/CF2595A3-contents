@@ -1,0 +1,190 @@
+---
+title: "AFE y AFC"
+author: "rmoraga"
+date: "2025-09-07"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+#Librerías
+
+```{r}
+library(openxlsx)
+library(psych)
+library(lavaan)
+library(paran)
+library(cebn) #librería profesor Claudio Bustos
+library(semTools)
+library(dplyr)
+library(knitr)
+library(writexl)
+
+
+```
+
+#Cargar base de datos
+
+```{r}
+db<-read.xlsx("db_final.xlsx")
+```
+
+#Separar base de datos en solo el instrumento PEIEL
+
+```{r}
+MB<-subset(db, select=MERIT_PERC_1:MERIT_PREF_4)
+```
+
+#1. Análisis fatorial exploratorio
+
+#1.1. Descriptivos escala
+
+```{r}
+psych::describe(MB)
+
+```
+
+#1.2. Ver las correlaciones
+
+```{r}
+corrgram::corrgram(MB)
+```
+
+
+#1.3. Bartlett
+
+```{r}
+cortest.bartlett(MB)
+#El test de esfericidad de Bartlett fue significativo, χ²(28) = 1612.96, p < .001, lo que indica que las correlaciones entre los ítems son adecuadas para realizar un análisis factorial.
+```
+
+#1.4. KMO
+
+```{r}
+KMO(MB)
+
+#El índice KMO fue de 0.57, indicando una adecuación muestral baja para realizar un análisis factorial. Los valores por ítem variaron entre 0.53 y 0.60, lo que sugiere correlaciones débiles entre los ítems y una estructura factorial poco definida.
+```
+
+
+#1.5. Paralelo de Horn
+
+```{r}
+paran::paran(na.omit(MB), iterations = 5000,centile = 95,cfa = T)
+#El análisis paralelo de Horn indicó la retención de cuatro factores, ya que los valores propios ajustados (λ > 0) fueron positivos hasta el cuarto componente. Esto sugiere que el instrumento presenta una estructura potencialmente tetradimensional, con cuatro factores que explican una proporción significativa de la varianza común.
+```
+
+#Prueba con 4 factores
+
+```{r}
+fa.4<-fa(MB, nfactors=4, fm="gls", rotate="oblimin")
+```
+
+#Prueba con 3 factores
+```{r}
+fa.3<-fa(MB, nfactors=3, fm="gls", rotate="oblimin")
+
+```
+
+
+#Para ver en excel
+
+```{r}
+fa2xlsx(fa.3, fa.4, cut = 0.4, filename = "análisis.factorial.MERIT.xlsx")
+
+#El análisis factorial exploratorio con método GLS y rotación oblimin identificó cuatro factores diferenciados en la escala de creencia en la meritocracia. Las cargas factoriales oscilaron entre 0.70 y 0.81, indicando una asociación fuerte entre los ítems y sus factores latentes. Cada dimensión mostró una estructura coherente entre los ítems de percepción y preferencia meritocrática, respaldando la validez factorial del instrumento en esta muestra.
+```
+
+#2. Análisis Factorial Confirmatorio
+```{r}
+dt<-data.frame(lapply(MB, as.numeric))
+
+```
+
+#Modelo 8 ítems 4 factores
+```{r}
+#Definifir el modelo 4 factores
+modelo.fa.4="
+MERIT_PREF_NEGAT=~ 1*MERIT_PREF_3 + 1*MERIT_PREF_4
+MERIT_PERC_POSIT=~ 1*MERIT_PERC_1 + 1*MERIT_PERC_2
+MERIT_PERC_NEGAT=~ 1*MERIT_PERC_3 + 1*MERIT_PERC_4
+MERIT_PREF_POSIT=~ 1*MERIT_PREF_2 + 1*MERIT_PREF_1
+"
+#Ajuste del modelo: cfa->especificación modelo ->base datos ->máxima veros robusta (recomendado)
+cfa.MB.4.mlr<-cfa(modelo.fa.4, dt, estimator="gls")
+
+summary(cfa.MB.4.mlr, standardized = TRUE)
+fitMeasures(cfa.MB.4.mlr)
+
+#El modelo confirmatorio de cuatro factores de la escala Creencias en la Meritocracia (MERIT) presentó un ajuste excelente, χ²(18) = 21.57, p = .25, CFI = .995, TLI = .993, RMSEA = .017 [IC90% 0.00–0.04], SRMR = .023. Todas las cargas factoriales fueron significativas (p < .001) y de magnitud moderada a alta (.61–.88), evidenciando una estructura factorial coherente y bien definida de las dimensiones meritocráticas.
+
+```
+#Confiabilidad modelo de 4 dimensiones
+```{r}
+rel_tab <- semTools::reliability(cfa.MB.4.mlr)
+
+rel_tab
+
+#Las cuatro dimensiones del modelo Creencias en la Meritocracia mostraron niveles de fiabilidad variables. Las subescalas MERIT_PREF_NEGAT (α = .85, ω = .85, AVE = .74) y MERIT_PERC_POSIT (α = .81, ω = .80, AVE = .67) presentaron alta consistencia interna y validez convergente, mientras que MERIT_PERC_NEGAT obtuvo fiabilidad aceptable (α = .75, AVE = .60). En cambio, MERIT_PREF_POSIT mostró una fiabilidad baja (α = .58), lo que sugiere que esta dimensión podría requerir revisión conceptual o ampliación de ítems.
+
+```
+
+#Tabla de cargas factoriales estandarizadas
+```{r}
+# Extraer las cargas factoriales estandarizadas (Std.all)
+res_merit <- standardizedSolution(cfa.MB.4.mlr)
+
+# Filtrar solo las relaciones de carga (=~)
+cargas_CFA_MERIT <- res_merit[res_merit$op == "=~", c("lhs", "rhs", "est.std")]
+
+# Renombrar columnas
+names(cargas_CFA_MERIT) <- c("Factor", "Ítem", "Carga")
+
+# Redondear valores
+cargas_CFA_MERIT$Carga <- round(cargas_CFA_MERIT$Carga, 3)
+
+# Exportar a Excel
+write_xlsx(cargas_CFA_MERIT, "cargas_MB.xlsx")
+
+```
+
+
+
+#Tabla Índices ajuste
+```{r}
+# Extraer principales índices de ajuste del modelo CFA
+indices_MERIT <- fitMeasures(cfa.MB.4.mlr,
+                             c("chisq", "df", "pvalue",
+                               "cfi", "tli",
+                               "rmsea", "rmsea.ci.lower", "rmsea.ci.upper",
+                               "srmr"))
+
+# Crear tabla formateada
+tabla_indices_MERIT <- data.frame(
+  Índice = c("χ² (gl)", "p", "CFI", "TLI", "RMSEA [IC90%]", "SRMR"),
+  Valor = c(
+    paste0(round(indices_MERIT["chisq"],2), " (", indices_MERIT["df"], ")"),
+    round(indices_MERIT["pvalue"],3),
+    round(indices_MERIT["cfi"],3),
+    round(indices_MERIT["tli"],3),
+    paste0(round(indices_MERIT["rmsea"],3)," [",
+           round(indices_MERIT["rmsea.ci.lower"],3),"–",
+           round(indices_MERIT["rmsea.ci.upper"],3),"]"),
+    round(indices_MERIT["srmr"],3)
+  )
+)
+
+# Exportar a Excel
+write_xlsx(tabla_indices_MERIT, "indices_ajuste_MB.xlsx")
+
+```
+
+
+
+
+
+
+
+
+
+

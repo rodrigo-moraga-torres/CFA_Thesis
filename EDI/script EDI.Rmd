@@ -1,0 +1,170 @@
+---
+title: "AFC EID"
+author: "rmoraga"
+date: "2025-09-07"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+#Librerías
+
+```{r}
+library(openxlsx)
+library(psych)
+library(lavaan)
+library(paran)
+library(cebn) #librería profesor Claudio Bustos
+library(semTools)
+library(knitr)
+library(dplyr)
+library(writexl)
+
+
+```
+
+#Cargar base de datos
+
+```{r}
+db<-read.xlsx("db_final.xlsx")
+```
+
+#Separar base de datos en solo el instrumento EDI
+
+```{r}
+EDI<-subset(db, select=EDI_1:EDI_4)
+```
+
+#1. Análisis fatorial exploratorio
+
+#1.1. Descriptivos escala
+
+```{r}
+psych::describe(EDI)
+
+```
+
+#1.2. Ver las correlaciones
+
+```{r}
+corrgram::corrgram(EDI)
+```
+
+#1.3. Bartlett
+
+```{r}
+cortest.bartlett(EDI)
+#
+
+```
+
+#1.4. KMO
+
+```{r}
+KMO(EDI)
+
+#El test de esfericidad de Bartlett fue significativo, χ²(6) = 911.72, p < .001, indicando que las correlaciones entre los ítems de la escala EID son adecuadas para el análisis factorial.
+```
+
+#1.5. Paralelo de Horn
+
+```{r}
+paran::paran(na.omit(EDI), iterations = 5000,centile = 95,cfa = T)
+
+#“El análisis paralelo de Horn (5000 iteraciones, criterio del percentil 95) indicó la retención de un único factor (eigenvalue ajustado = 1.72). Esto respalda la unidimensionalidad de la escala de Evaluación de Injusticia Distributiva, coherente con la propuesta teórica del instrumento.”
+```
+
+
+
+
+
+#2. Análisis Factorial Confirmatorio
+```{r}
+dt<-data.frame(lapply(EDI, as.numeric))
+
+```
+
+#Modelo 4 ítems 1 factor
+```{r}
+modelo.fa.1="
+modelo.fa.1cfa=~ EDI_1 + EDI_2 + EDI_3 + EDI_4
+"
+
+cfa.EDI.1.mlr<-cfa(modelo.fa.1, dt, estimator="mlr")
+
+summary(cfa.EDI.1.mlr)
+fitMeasures(cfa.EDI.1.mlr)
+summary(cfa.EDI.1.mlr , standardized=TRUE)
+
+#El modelo unidimensional de la escala Evaluación de Injusticia Distributiva (EID) presentó un ajuste excelente, χ²(2) = 0.68, p = .71, CFI = 1.00, TLI = 1.01, RMSEA = 0.00 [IC90% 0.00–0.05], SRMR = 0.006. Las cargas factoriales oscilaron entre .48 y .88, todas significativas (p < .001), confirmando la validez estructural y la coherencia interna del modelo unidimensional.
+```
+
+#Confiabilidad 
+```{r}
+rel_tab <- semTools::reliability(cfa.EDI.1.mlr)
+
+rel_tab
+
+#La escala Evaluación de Injusticia Distributiva (EID) mostró una adecuada fiabilidad (α = .78; ω = .80) y una varianza promedio extraída de .51, indicando buena consistencia interna y validez convergente del constructo.
+```
+
+
+#Tabla cargas factoriales estandarizadas
+```{r}
+# Extraer las cargas estandarizadas del CFA
+cargas_EDI <- standardizedSolution(cfa.EDI.1.mlr) %>%
+  filter(op == "=~") %>%
+  select(Item = rhs, Carga = est.std)
+
+# Redondear los valores
+cargas_EDI$Carga <- round(cargas_EDI$Carga, 3)
+
+# Ver en consola
+print(cargas_EDI)
+
+write_xlsx(cargas_EDI, "cargas_EDI.xlsx")
+
+
+
+```
+
+#Tabla índices de ajuste
+```{r}
+# Extraer los principales índices de ajuste del modelo EDI
+indices_EDI <- fitMeasures(cfa.EDI.1.mlr,
+                           c("chisq.scaled", "df.scaled", "pvalue.scaled",
+                             "cfi.robust", "tli.robust",
+                             "rmsea.robust", "rmsea.ci.lower.robust",
+                             "rmsea.ci.upper.robust", "srmr"))
+
+# Crear tabla formateada
+tabla_indices_EDI <- data.frame(
+  Índice = c("χ² (gl)", "p", "CFI", "TLI", "RMSEA [IC90%]", "SRMR"),
+  Valor = c(
+    paste0(round(indices_EDI["chisq.scaled"],2), " (", indices_EDI["df.scaled"], ")"),
+    round(indices_EDI["pvalue.scaled"],3),
+    round(indices_EDI["cfi.robust"],3),
+    round(indices_EDI["tli.robust"],3),
+    paste0(round(indices_EDI["rmsea.robust"],3)," [",
+           round(indices_EDI["rmsea.ci.lower.robust"],3),"–",
+           round(indices_EDI["rmsea.ci.upper.robust"],3),"]"),
+    round(indices_EDI["srmr"],3)
+  )
+)
+
+# Mostrar tabla en formato APA
+kable(tabla_indices_EDI, caption = "Tabla. Índices de ajuste del modelo confirmatorio de la escala EDI")
+
+#Exportar excel
+write_xlsx(tabla_indices_EDI, "indices_ajuste_EDI.xlsx")
+
+
+```
+
+
+
+
+
+
+
+

@@ -1,0 +1,58 @@
+---
+title: "Untitled"
+author: "rmoraga"
+date: "2025-09-07"
+output: html_document
+---
+
+#Librerías
+
+```{r}
+library(openxlsx)
+library(psych)
+library(lavaan)
+```
+
+#Cargar base de datos
+
+```{r}
+db<-read.xlsx("20250906_Análisis_preliminar.xlsx")
+```
+
+#Separar base de datos en solo el instrumento PEIEL
+
+```{r}
+PEIEL<-subset(db, select=PEIEL_1:PEIEL_6)
+```
+
+
+#Confiabilidad PEIEL
+```{r}
+alpha(PEIEL)
+```
+
+#1. Análisis fatorial exploratorio
+
+#1.1. Descriptivos escala
+```{r}
+psych::describe(PEIEL)
+
+```
+
+#1.2. Ver las correlaciones
+```{r}
+corrgram::corrgram(PEIEL)
+```
+
+#1.3. Bartlett
+```{r}
+corrm
+```
+
+
+
+
+
+
+
+

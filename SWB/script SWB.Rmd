@@ -1,0 +1,155 @@
+---
+title: "AFC SWB"
+author: "rmoraga"
+date: "2025-09-07"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+#Librerías
+
+```{r}
+library(openxlsx)
+library(psych)
+library(lavaan)
+library(paran)
+library(cebn) #librería profesor Claudio Bustos
+library(semTools)
+library(dplyr)
+library(writexl)
+
+```
+
+#Cargar base de datos
+
+```{r}
+db<-read.xlsx("db_final.xlsx")
+```
+
+#Separar base de datos en solo el instrumento SWB
+
+```{r}
+SWB<-subset(db, select=SWB_1:SWB_5)
+```
+
+#1. Análisis fatorial exploratorio
+
+#1.1. Descriptivos escala
+
+```{r}
+psych::describe(SWB)
+
+```
+
+#1.2. Ver las correlaciones
+
+```{r}
+corrgram::corrgram(SWB)
+```
+
+#1.3. Bartlett
+
+```{r}
+cortest.bartlett(SWB)
+#El test de esfericidad de Bartlett fue significativo, χ²(10) = 1678.93, p < .001, indicando que las correlaciones entre los ítems son adecuadas para realizar un análisis factorial.
+```
+
+#1.4. KMO
+
+```{r}
+KMO(SWB)
+
+#La medida de adecuación muestral de Kaiser-Meyer-Olkin (KMO) fue excelente (KMO global = 0.87), con valores por ítem entre 0.83 y 0.91. Estos resultados indican que la matriz de correlaciones de la escala SWB es adecuada para la aplicación de análisis factoriales.
+```
+
+#1.5. Paralelo de Horn
+
+```{r}
+paran::paran(na.omit(SWB), iterations = 5000,centile = 95,cfa = T)
+
+#“El análisis paralelo de Horn con 5000 simulaciones indicó la retención de un único factor (eigenvalue ajustado = 2.63), lo que respalda la unidimensionalidad de la escala de Bienestar Subjetivo en esta muestra.”
+```
+
+#2. Análisis Factorial Confirmatorio
+```{r}
+dt<-data.frame(lapply(SWB, as.numeric))
+
+```
+
+#Modelo 5 ítems 1 factor
+```{r}
+modelo.fa.1="
+modelo.fa.1cfa=~ SWB_1 + SWB_2 + SWB_3 + SWB_4 + SWB_5
+"
+
+cfa.SWB.1.mlr<-cfa(modelo.fa.1, dt, estimator="mlr")
+
+summary(cfa.SWB.1.mlr)
+fitMeasures(cfa.SWB.1.mlr)
+
+#El modelo confirmatorio unidimensional de la escala Bienestar Subjetivo (SWB) mostró un ajuste adecuado a los datos: χ²(5) = 10.30, p = .07, CFI = .996, TLI = .991, RMSEA = .045 [IC90% 0.01–0.08], SRMR = .015. Todas las cargas factoriales fueron significativas (p < .001) y oscilaron entre 0.61 y 0.86, indicando que los ítems se relacionan fuertemente con el factor de bienestar subjetivo.
+```
+
+```{r}
+rel_tab <- semTools::reliability(cfa.SWB.1.mlr)
+
+rel_tab
+
+#La escala SWB alcanzó una elevada consistencia interna (α = .87; ω = .87) y un índice de varianza extraída promedio satisfactorio (AVE = .57), lo que respalda su fiabilidad y validez convergente. Junto con los resultados del AFC, estos hallazgos confirman que la escala posee una estructura unidimensional sólida y es un instrumento válido y confiable para medir el bienestar subjetivo.
+```
+
+#Tabla cargas factoriales
+```{r}
+ # Extraer las cargas factoriales estandarizadas
+res_swb <- standardizedSolution(cfa.SWB.1.mlr)
+
+# Filtrar las relaciones de carga (=~)
+cargas_CFA_SWB <- res_swb[res_swb$op == "=~", c("rhs", "est.std")]
+names(cargas_CFA_SWB) <- c("Ítem", "Carga")
+
+# Redondear valores
+cargas_CFA_SWB$Carga <- round(cargas_CFA_SWB$Carga, 3)
+
+# Exportar a Excel
+write_xlsx(cargas_CFA_SWB, "cargas_SWB.xlsx")
+
+
+```
+
+
+#Tabla índices de ajuste del modelo CFA
+```{r}
+# Extraer principales índices de ajuste
+indices_SWB <- fitMeasures(cfa.SWB.1.mlr,
+                           c("chisq.scaled","df.scaled","pvalue.scaled",
+                             "cfi.robust","tli.robust",
+                             "rmsea.robust","rmsea.ci.lower.robust",
+                             "rmsea.ci.upper.robust","srmr"))
+
+# Crear tabla formateada
+tabla_indices_SWB <- data.frame(
+  Índice = c("χ² (gl)", "p", "CFI", "TLI", "RMSEA [IC90%]", "SRMR"),
+  Valor = c(
+    paste0(round(indices_SWB["chisq.scaled"],2), " (", indices_SWB["df.scaled"], ")"),
+    round(indices_SWB["pvalue.scaled"],3),
+    round(indices_SWB["cfi.robust"],3),
+    round(indices_SWB["tli.robust"],3),
+    paste0(round(indices_SWB["rmsea.robust"],3)," [",
+           round(indices_SWB["rmsea.ci.lower.robust"],3),"–",
+           round(indices_SWB["rmsea.ci.upper.robust"],3),"]"),
+    round(indices_SWB["srmr"],3)
+  )
+)
+
+# Exportar a Excel
+write_xlsx(tabla_indices_SWB, "indices_ajuste_SWB.xlsx")
+
+```
+
+
+
+
+
+
+
