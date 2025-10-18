@@ -1,0 +1,177 @@
+---
+title: "AFE y AFC"
+author: "rmoraga"
+date: "2025-09-07"
+output:
+html_document: default
+pdf_document: default
+---
+
+#Librerías
+
+```{r}
+library(openxlsx)
+library(psych)
+library(lavaan)
+library(paran)
+library(cebn) #librería profesor Claudio Bustos
+library(semTools)
+library(dplyr)
+library(lavaan)
+library(knitr)
+library(writexl)
+
+```
+
+#Cargar base de datos
+
+```{r}
+db<-read.xlsx("db_final.xlsx")
+```
+
+#Separar base de datos en solo el instrumento PEIEL
+
+```{r}
+PEIEL<-subset(db, select=PEIEL_1:PEIEL_6)
+```
+
+#1. Análisis fatorial exploratorio
+
+#1.1. Descriptivos escala
+
+```{r}
+psych::describe(PEIEL)
+
+```
+
+#1.2. Ver las correlaciones
+
+```{r}
+corrgram::corrgram(PEIEL)
+```
+
+#1.3. Bartlett
+
+```{r}
+cortest.bartlett(PEIEL)
+
+#El test de esfericidad de Bartlett fue significativo, χ²(15) = 2510.19, p < .001, indicando que las correlaciones entre los ítems son adecuadas para realizar un análisis factorial.
+```
+
+#1.4. KMO
+
+```{r}
+KMO(PEIEL)
+
+#El índice KMO fue de 0.84, lo que indica una adecuación muestral meritoria para realizar un análisis factorial. Todos los ítems presentaron valores individuales superiores a 0.80, evidenciando buena correlación común entre ellos.
+```
+
+#1.5. Paralelo de Horn
+
+```{r}
+paran::paran(na.omit(PEIEL), iterations = 5000,centile = 95,cfa = T)
+```
+
+#Prueba con 2 factores
+
+```{r}
+fa.2<-fa(PEIEL, nfactors=2, fm="minres", rotate="oblimin")
+```
+
+#Para ver en excel
+
+```{r}
+fa2xlsx(fa.2, cut = 0.4, filename = "análisis.factorial.PEIEL.xlsx")
+
+#El AFE confirma una estructura de dos factores claramente diferenciados y coherentes teóricamente, explicando adecuadamente la varianza de los ítems. Esto respalda la validez estructural de la escala PEIEL en tu muestra.
+
+```
+
+
+
+
+
+#2. Análisis Factorial Confirmatorio
+```{r}
+dt<-data.frame(lapply(PEIEL, as.numeric))
+
+```
+
+#Modelo 6 ítems 2 factores
+
+```{r}
+modelo.fa.2="
+accesobys=~ PEIEL_1 + PEIEL_2 + PEIEL_3 
+adversidadfinanciera=~ PEIEL_4 + PEIEL_5 + PEIEL_6
+"
+
+cfa.PEIEL.2.mlr<-cfa(modelo.fa.2, dt, estimator="mlr")
+
+summary(cfa.PEIEL.2.mlr)
+fitMeasures(cfa.PEIEL.2.mlr)
+
+#El análisis factorial confirmatorio del modelo bidimensional de la escala PEIEL mostró un ajuste excelente a los datos, χ²(8) = 15.36, p = .052, CFI = .995, TLI = .991, RMSEA = .045 [IC90% .00–.078], SRMR = .019. Todas las cargas factoriales fueron elevadas y significativas (p < .001), y los dos factores correlacionaron positivamente (r = .72, p < .001), confirmando una estructura de dos dimensiones interrelacionadas de desigualdad percibida: acceso a bienes y servicios y adversidad financiera.
+```
+
+#Confiabilidad modelo de dos dimensiones
+```{r}
+rel_tab <- semTools::reliability(cfa.PEIEL.2.mlr)
+
+rel_tab
+
+#Los análisis de fiabilidad mostraron valores satisfactorios para ambas dimensiones de la escala PEIEL. La subescala Acceso a bienes y servicios presentó α = .83, ω = .83 y AVE = .63, mientras que la subescala Adversidad financiera alcanzó α = .87, ω = .88 y AVE = .70. Estos resultados indican una buena consistencia interna y validez convergente adecuada de ambas dimensiones.
+
+```
+
+
+
+
+#Tabla cargas fatoriales estandarizadas
+```{r}
+#Extraer cargas factoriales
+res <- standardizedSolution(cfa.PEIEL.2.mlr)
+cargas_CFA_PEIEL <- res[res$op == "=~", c("lhs", "rhs", "est.std")]
+names(cargas_CFA_PEIEL) <- c("Factor", "Ítem", "Carga")
+cargas_CFA_PEIEL$Carga <- round(cargas_CFA_PEIEL$Carga, 3)
+
+#Mostrar tabla
+kable(cargas_CFA_PEIEL,
+      caption = "Tabla. Cargas factoriales estandarizadas de la escala PEIEL")
+
+write_xlsx(cargas_CFA_PEIEL, "cargas_CFA_PEIEL.xlsx")
+
+
+```
+
+
+#Tabla índices de ajuste
+```{r}
+# Extraer los principales índices de ajuste del modelo CFA
+indices_PEIEL <- fitMeasures(cfa.PEIEL.2.mlr,
+                             c("chisq.scaled", "df.scaled", "pvalue.scaled",
+                               "cfi.robust", "tli.robust",
+                               "rmsea.robust", "rmsea.ci.lower.robust",
+                               "rmsea.ci.upper.robust", "srmr"))
+
+# Crear tabla legible
+tabla_indices_PEIEL <- data.frame(
+  Índice = c("χ² (gl)", "p", "CFI", "TLI", "RMSEA [IC90%]", "SRMR"),
+  Valor = c(
+    paste0(round(indices_PEIEL["chisq.scaled"],2), " (", indices_PEIEL["df.scaled"], ")"),
+    round(indices_PEIEL["pvalue.scaled"],3),
+    round(indices_PEIEL["cfi.robust"],3),
+    round(indices_PEIEL["tli.robust"],3),
+    paste0(round(indices_PEIEL["rmsea.robust"],3)," [",
+           round(indices_PEIEL["rmsea.ci.lower.robust"],3),"–",
+           round(indices_PEIEL["rmsea.ci.upper.robust"],3),"]"),
+    round(indices_PEIEL["srmr"],3)
+  )
+)
+
+#Exportar a Excel
+write_xlsx(tabla_indices_PEIEL, "indices_ajuste_PEIEL.xlsx")
+
+```
+
+
+
