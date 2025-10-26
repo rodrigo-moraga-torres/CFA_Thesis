@@ -1,6 +1,6 @@
 {
     "id": "CF2595A3",
-    "path": "C:/Users/romor/OneDrive/Escritorio/AFC/MB/script MB.Rmd",
+    "path": "~/GitHub/CFA_Thesis/MB/script MB.Rmd",
     "project_path": "script MB.Rmd",
     "type": "r_markdown",
     "hash": "4198136516",
@@ -12,15 +12,15 @@
     "properties": {
         "source_window_id": "",
         "Source": "Source",
-        "cursorPosition": "176,2",
-        "scrollLine": "159"
+        "cursorPosition": "34,48",
+        "scrollLine": "24"
     },
     "folds": "",
     "lastKnownWriteTime": 1760794819,
     "encoding": "UTF-8",
     "collab_server": "",
     "source_window": "",
-    "last_content_update": 1760794819172,
+    "last_content_update": 1761093015301,
     "read_only": false,
     "read_only_alternatives": []
 }
